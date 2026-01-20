@@ -3,7 +3,7 @@ name: Supreme Court Decision Tracker
 # Runs every Monday at 10am (Court releases opinions on decision days)
 on:
   schedule:
-    - cron: '35 18 * * 1'  # Every Monday at 1:35 PM EST / 2:35 PM EDT
+    - cron: '0 18 * * 1-3'  # Every Monday-Wednesday at 1:00 PM EST / 2:00 PM EDT
   workflow_dispatch:  # Allow manual trigger
 
 jobs:
