@@ -1,0 +1,38 @@
+name: Supreme Court Decision Tracker
+
+# Runs every Monday at 10am (Court releases opinions on decision days)
+on:
+  schedule:
+    - cron: '35 18 * * 1'  # Every Monday at 1:35 PM EST / 2:35 PM EDT
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  track-decisions:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install requests google-generativeai feedparser
+    
+    - name: Fetch and analyze Supreme Court decisions
+      env:
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      run: |
+        python supreme_court_analyzer.py
+    
+    - name: Commit and push if changed
+      run: |
+        git config --global user.name 'GitHub Action'
+        git config --global user.email 'action@github.com'
+        git add supreme_court_decisions.csv
+        git diff --quiet && git diff --staged --quiet || git commit -m "Update Supreme Court decisions - $(date +'%Y-%m-%d')"
+        git push
