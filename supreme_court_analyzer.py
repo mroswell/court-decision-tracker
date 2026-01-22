@@ -13,12 +13,12 @@ from datetime import datetime, timedelta
 import time
 
 # Configure Gemini
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
-if not GEMINI_API_KEY:
-    print("ERROR: GEMINI_API_KEY not found in environment variables")
+GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
+if not GOOGLE_API_KEY:
+    print("ERROR: GOOGLE_API_KEY not found in environment variables")
     exit(1)
 
-genai.configure(api_key=GEMINI_API_KEY)
+genai.configure(api_key=GOOGLE_API_KEY)
 model = genai.GenerativeModel('gemini-pro')
 
 # CourtListener API (free, no key required)
