@@ -19,7 +19,9 @@ if not GOOGLE_API_KEY:
     exit(1)
 
 genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-pro')
+# model = genai.GenerativeModel('gemini-pro')
+model = genai.GenerativeModel('gemini-1.5-pro')
+
 
 # CourtListener API (free, no key required)
 COURTLISTENER_API = "https://www.courtlistener.com/api/rest/v3/opinions/"
