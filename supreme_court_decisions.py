@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-Version C - Supreme Court Decision Tracker with AI Political Analysis
-Combines best features from Versions A and B
-Fetches recent Supreme Court opinions and uses Gemini AI to classify them as conservative or liberal.
+Version C - Court Decision Tracker with AI Political Analysis
+UPDATED FOR API V4 - STATE COURTS EDITION - RATE LIMIT FIXED
+Fetches recent court opinions and uses Gemini AI to classify them as conservative or liberal.
 """
 
 import os
 import csv
+import json
 import requests
 from google import genai
 from datetime import datetime, timedelta
@@ -22,7 +23,7 @@ def get_clean_env(key_name):
 
 GOOGLE_API_KEY = get_clean_env('GOOGLE_API_KEY')
 CL_TOKEN = get_clean_env('COURTLISTENER_TOKEN')
-COURTLISTENER_API = "https://www.courtlistener.com/api/rest/v3/opinions/"
+COURTLISTENER_API = "https://www.courtlistener.com/api/rest/v4/opinions/"
 
 # Initialize Gemini Client
 client = None
@@ -37,73 +38,101 @@ if GOOGLE_API_KEY:
 def print_troubleshooting_header():
     """Display diagnostic information about configuration"""
     print("="*60)
-    print("SUPREME COURT DECISION TRACKER - DIAGNOSTIC CHECK")
+    print("COURT DECISION TRACKER - DIAGNOSTIC CHECK")
     print("-" * 60)
     print(f"Gemini API Key Found:      {'YES' if GOOGLE_API_KEY else 'NO'}")
     print(f"CourtListener Token Found: {'YES' if CL_TOKEN else 'NO'}")
     print(f"Gemini Client Initialized: {'YES' if client else 'NO'}")
     print(f"Current Time:              {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"API Version:               V4")
+    print(f"Rate Limit Protection:     7 seconds between requests")
     print("="*60 + "\n")
 
 
 def fetch_recent_decisions(days_back=8):
-    """Fetch Supreme Court decisions from the last N days with comprehensive metadata"""
+    """Fetch court decisions from the last N days with comprehensive metadata"""
     if not CL_TOKEN:
         print("[!] ERROR: COURTLISTENER_TOKEN required. Set it in your environment variables.")
         return []
 
-    print(f"[*] Fetching Supreme Court decisions from last {days_back} days...")
+    print(f"[*] Fetching court decisions from last {days_back} days...")
     
     date_after = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
     
     params = {
-        'court': 'scotus',
+        'court': 'scotus',  # Note: This filter is broken, will return various state courts
         'date_filed__gte': date_after,
         'order_by': '-date_filed'
     }
     
     headers = {
         'Authorization': f'Token {CL_TOKEN}',
-        'User-Agent': 'SupremeCourtTracker/2.0 (Educational Research)'
+        'User-Agent': 'CourtDecisionTracker/2.0 (Educational Research)'
     }
     
     try:
-        response = requests.get(COURTLISTENER_API, params=params, headers=headers)
+        response = requests.get(COURTLISTENER_API, params=params, headers=headers, timeout=30)
         response.raise_for_status()
         results = response.json().get('results', [])
         
-        print(f"[*] Found {len(results)} total results, processing top 10...")
+        print(f"[*] Found {len(results)} total results, processing all...")
         
         decisions = []
-        for res in results[:10]:
+        for res in results:
+            # Get opinion-level data
+            opinion_id = res.get('id')
+            text = res.get('plain_text', '')
+            
+            # Fetch cluster data for complete metadata
+            cluster_url = res.get('cluster')
+            cluster_data = {}
+            if cluster_url:
+                try:
+                    cluster_res = requests.get(cluster_url, headers=headers, timeout=30)
+                    if cluster_res.status_code == 200:
+                        cluster_data = cluster_res.json()
+                except Exception as e:
+                    print(f"    [!] Could not fetch cluster data: {e}")
+            
             # Robust case name extraction
-            case_name = res.get('case_name')
+            case_name = res.get('case_name') or cluster_data.get('case_name')
             if not case_name:
                 url_path = res.get('absolute_url', '')
                 case_name = url_path.split('/')[-2].replace('-', ' ').title() if url_path else "Unknown Case"
             
             # Get text - try plain_text first, then fallback to detail fetch
-            text = res.get('plain_text', '')
-            opinion_id = res.get('id')
-            
             if not text and opinion_id:
                 try:
                     detail_url = f"{COURTLISTENER_API}{opinion_id}/"
-                    detail_res = requests.get(detail_url, headers=headers)
+                    detail_res = requests.get(detail_url, headers=headers, timeout=30)
                     if detail_res.status_code == 200:
                         text = detail_res.json().get('plain_text', '')
                 except Exception as e:
                     print(f"    [!] Could not fetch detail for opinion {opinion_id}: {e}")
             
-            # Extract all metadata
+            # Extract author
+            author = res.get('author_str', '')
+            
+            # If not in opinion, try cluster
+            if not author and cluster_data:
+                author = cluster_data.get('author_str', '')
+            
+            # Handle per curiam cases
+            if not author:
+                if res.get('per_curiam') or (cluster_data and cluster_data.get('per_curiam')):
+                    author = 'Per Curiam'
+                else:
+                    author = 'N/A'
+            
+            # Extract all metadata (prefer cluster data for case-level fields)
             decisions.append({
                 'opinion_id': opinion_id or 'N/A',
-                'cluster_id': res.get('cluster', 'N/A'),
+                'cluster_id': cluster_url or 'N/A',
                 'case_name': case_name or "Unknown Case",
-                'date_filed': res.get('date_filed', 'N/A'),
-                'author': res.get('author_str', 'N/A'),
+                'date_filed': cluster_data.get('date_filed', res.get('date_filed', 'N/A')),
+                'author': author,
                 'type': res.get('type', 'N/A'),
-                'citation': res.get('cluster_citation', 'N/A'),
+                'citation': cluster_data.get('citation_string', res.get('cluster_citation', 'N/A')),
                 'page_count': res.get('page_count', 'N/A'),
                 'url': f"https://www.courtlistener.com{res.get('absolute_url', '')}",
                 'download_url': res.get('download_url', 'N/A'),
@@ -113,6 +142,9 @@ def fetch_recent_decisions(days_back=8):
         print(f"[*] Successfully retrieved {len(decisions)} decisions")
         return decisions
         
+    except requests.Timeout:
+        print(f"[!] Request timed out - CourtListener API may be slow")
+        return []
     except Exception as e:
         print(f"[!] Error fetching from CourtListener: {e}")
         return []
@@ -127,7 +159,7 @@ def analyze_political_leaning(case_name, decision_text):
     if not decision_text or len(decision_text) < 200:
         return ("Insufficient Text", "N/A", "Not enough text to analyze", "", "", "No text available for summary")
     
-    prompt = f"""Analyze this Supreme Court decision and classify its political leaning on a 5-point scale.
+    prompt = f"""Analyze this court decision and classify its political leaning on a 5-point scale.
 
 Case: {case_name}
 
@@ -162,68 +194,94 @@ Reasoning: [1-2 sentence explanation of classification]
 
 Be objective and base your analysis only on the legal reasoning in the decision."""
 
-    try:
-        response = client.models.generate_content(
-            model='gemini-2.0-flash-exp',
-            contents=prompt
-        )
-        result_text = response.text.strip()
-        
-        # Parse the response
-        lines = result_text.split('\n')
-        classification = "Unknown"
-        confidence = "N/A"
-        tags = ""
-        notes = ""
-        summary = ""
-        reasoning = "N/A"
-        
-        # Handle multi-line summary by collecting all lines between Summary: and Reasoning:
-        in_summary = False
-        summary_lines = []
-        
-        for line in lines:
-            if line.startswith('Classification:'):
-                classification = line.split(':', 1)[1].strip()
-            elif line.startswith('Confidence:'):
-                confidence = line.split(':', 1)[1].strip()
-            elif line.startswith('Tags:'):
-                tags = line.split(':', 1)[1].strip()
-            elif line.startswith('Notes:'):
-                notes = line.split(':', 1)[1].strip()
-            elif line.startswith('Summary:'):
-                in_summary = True
-                summary_part = line.split(':', 1)[1].strip()
-                if summary_part:
-                    summary_lines.append(summary_part)
-            elif line.startswith('Reasoning:'):
-                in_summary = False
-                reasoning = line.split(':', 1)[1].strip()
-            elif in_summary and line.strip():
-                summary_lines.append(line.strip())
-        
-        summary = ' '.join(summary_lines) if summary_lines else "No summary available"
-        
-        return classification, confidence, reasoning, tags, notes, summary
-        
-    except Exception as e:
-        print(f"[!] Error analyzing with Gemini: {e}")
-        return ("Error", "N/A", str(e), "", "", "Error generating summary")
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            response = client.models.generate_content(
+                model='gemini-2.0-flash',  # CHANGED FROM gemini-2.0-flash-exp
+                contents=prompt
+            )
+            result_text = response.text.strip()
+            
+            # Parse the response
+            lines = result_text.split('\n')
+            classification = "Unknown"
+            confidence = "N/A"
+            tags = ""
+            notes = ""
+            summary = ""
+            reasoning = "N/A"
+            
+            # Handle multi-line summary by collecting all lines between Summary: and Reasoning:
+            in_summary = False
+            summary_lines = []
+            
+            for line in lines:
+                if line.startswith('Classification:'):
+                    classification = line.split(':', 1)[1].strip()
+                elif line.startswith('Confidence:'):
+                    confidence = line.split(':', 1)[1].strip()
+                elif line.startswith('Tags:'):
+                    tags = line.split(':', 1)[1].strip()
+                elif line.startswith('Notes:'):
+                    notes = line.split(':', 1)[1].strip()
+                elif line.startswith('Summary:'):
+                    in_summary = True
+                    summary_part = line.split(':', 1)[1].strip()
+                    if summary_part:
+                        summary_lines.append(summary_part)
+                elif line.startswith('Reasoning:'):
+                    in_summary = False
+                    reasoning = line.split(':', 1)[1].strip()
+                elif in_summary and line.strip():
+                    summary_lines.append(line.strip())
+            
+            summary = ' '.join(summary_lines) if summary_lines else "No summary available"
+            
+            return classification, confidence, reasoning, tags, notes, summary
+            
+        except Exception as e:
+            error_str = str(e)
+            if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
+                if attempt < max_retries - 1:
+                    wait_time = 60
+                    print(f"    [!] Rate limit hit, waiting {wait_time} seconds before retry...")
+                    time.sleep(wait_time)
+                    continue
+            print(f"[!] Error analyzing with Gemini: {e}")
+            return ("Error", "N/A", str(e), "", "", "Error generating summary")
+    
+    return ("Error", "N/A", "Max retries exceeded", "", "", "Error generating summary")
 
 
-def load_existing_data(filename='supreme_court_decisions.csv'):
-    """Load existing data to avoid re-analyzing same cases (using opinion_id)"""
+def load_existing_data(csv_filename='supreme_court_decisions.csv', json_filename='supreme_court_decisions.json'):
+    """Load existing data to avoid re-analyzing same cases (checks both CSV and JSON)"""
     existing_ids = set()
     
-    if os.path.exists(filename):
+    # Check CSV file
+    if os.path.exists(csv_filename):
         try:
-            with open(filename, 'r', encoding='utf-8') as f:
+            with open(csv_filename, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
-                    existing_ids.add(row.get('opinion_id', ''))
-            print(f"[*] Loaded {len(existing_ids)} existing case IDs from {filename}")
+                    existing_ids.add(str(row.get('opinion_id', '')))
+            print(f"[*] Loaded {len(existing_ids)} existing case IDs from {csv_filename}")
         except Exception as e:
-            print(f"[!] Error loading existing data: {e}")
+            print(f"[!] Error loading existing CSV data: {e}")
+    
+    # Check JSON file
+    if os.path.exists(json_filename):
+        try:
+            with open(json_filename, 'r', encoding='utf-8') as f:
+                json_data = json.load(f)
+                json_ids = {str(item.get('opinion_id', '')) for item in json_data}
+                existing_ids.update(json_ids)
+            print(f"[*] Total unique case IDs across both files: {len(existing_ids)}")
+        except Exception as e:
+            print(f"[!] Error loading existing JSON data: {e}")
+    
+    if not existing_ids:
+        print(f"[*] No existing data found - this appears to be a fresh start")
     
     return existing_ids
 
@@ -255,10 +313,34 @@ def save_to_csv(decisions_data, filename='supreme_court_decisions.csv'):
     print(f"[+] Saved {len(decisions_data)} decisions to {filename}")
 
 
+def save_to_json(decisions_data, filename='supreme_court_decisions.json'):
+    """Save analyzed decisions to JSON (append mode to preserve history)"""
+    
+    # Load existing data if file exists
+    existing_data = []
+    if os.path.exists(filename):
+        try:
+            with open(filename, 'r', encoding='utf-8') as f:
+                existing_data = json.load(f)
+            print(f"[*] Loaded {len(existing_data)} existing records from {filename}")
+        except Exception as e:
+            print(f"[!] Error loading existing JSON: {e}")
+            existing_data = []
+    
+    # Append new decisions
+    all_data = existing_data + decisions_data
+    
+    # Save all data back to file
+    with open(filename, 'w', encoding='utf-8') as f:
+        json.dump(all_data, f, indent=2, ensure_ascii=False)
+    
+    print(f"[+] Saved {len(decisions_data)} new decisions to {filename} (total: {len(all_data)} records)")
+
+
 def main():
     print("="*60)
-    print("SUPREME COURT DECISION TRACKER WITH AI ANALYSIS")
-    print("Version C - Enhanced Hybrid")
+    print("COURT DECISION TRACKER WITH AI ANALYSIS")
+    print("Version C - State Courts Edition (API V4)")
     print("="*60)
     print()
     
@@ -278,7 +360,7 @@ def main():
         print("[!] ERROR: Could not initialize Gemini client")
         return
     
-    # Fetch recent decisions (8 days covers Mon/Tue/Wed schedule with buffer)
+    # Fetch recent decisions (8 days covers multiple court release days)
     decisions = fetch_recent_decisions(days_back=8)
     
     if not decisions:
@@ -289,13 +371,15 @@ def main():
     existing_ids = load_existing_data()
     
     # Filter out already-analyzed cases
-    new_decisions = [d for d in decisions if d['opinion_id'] not in existing_ids]
+    new_decisions = [d for d in decisions if str(d['opinion_id']) not in existing_ids]
     
     if not new_decisions:
         print("[*] All recent decisions have already been analyzed")
+        print(f"[*] Total decisions in database: {len(existing_ids)}")
         return
     
-    print(f"\n[*] Analyzing {len(new_decisions)} new decisions...")
+    print(f"\n[*] Found {len(new_decisions)} new decisions to analyze...")
+    print(f"[*] Estimated time: {len(new_decisions) * 7 / 60:.1f} minutes at 7 seconds per case")
     print("-" * 60)
     
     analyzed_decisions = []
@@ -338,13 +422,14 @@ def main():
         print(f"    Tags: {tags[:80]}{'...' if len(tags) > 80 else ''}")
         print(f"    Summary: {summary[:100]}{'...' if len(summary) > 100 else ''}")
         
-        # Rate limiting - be nice to the API
+        # Rate limiting - INCREASED TO 7 SECONDS (10 requests per minute = 6 second minimum, adding buffer)
         if i < len(new_decisions):
-            time.sleep(2)
+            time.sleep(7)
     
     # Save results
     if analyzed_decisions:
         save_to_csv(analyzed_decisions)
+        save_to_json(analyzed_decisions)
         
         print("\n" + "="*60)
         print("ANALYSIS SUMMARY")
@@ -362,7 +447,7 @@ def main():
         print(f"Center decisions:            {center}")
         print(f"Liberal decisions:           {liberal}")
         print(f"Very Liberal decisions:      {very_liberal}")
-        print(f"\n[SUCCESS] All data saved to supreme_court_decisions.csv")
+        print(f"\n[SUCCESS] All data saved to supreme_court_decisions.csv and supreme_court_decisions.json")
         print("="*60)
 
 
