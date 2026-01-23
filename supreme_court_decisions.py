@@ -1,9 +1,18 @@
+
+"""
+Version B
+Supreme Court Decision Tracker with AI Political Analysis
+Fetches recent Supreme Court opinions and uses Gemini AI to classify them as conservative or liberal.
+"""
+
 import os
 import csv
 import requests
 from google import genai
 from datetime import datetime, timedelta
 import time
+
+# Version Assumption: Using Gemini API from google-genai package
 
 # --- CONFIGURATION & CLEANING ---
 def get_clean_env(key_name):
@@ -112,7 +121,7 @@ def main():
             writer = csv.DictWriter(f, fieldnames=processed[0].keys())
             writer.writeheader()
             writer.writerows(processed)
-        print("\n[SUCCESS] Results saved to scotus_results.csv")
+        print("\n[SUCCESS] Results saved to scotus_decisions.csv")
 
 if __name__ == "__main__":
     main()

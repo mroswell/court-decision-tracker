@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+Version A
 Supreme Court Decision Tracker with AI Political Analysis
 Fetches recent Supreme Court opinions and uses Gemini AI to classify them as conservative or liberal.
 """
@@ -11,6 +12,7 @@ import feedparser
 import google.generativeai as genai
 from datetime import datetime, timedelta
 import time
+
 
 # Configure Gemini
 GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
