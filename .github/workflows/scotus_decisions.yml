@@ -1,5 +1,4 @@
-name: Supreme Court Decision Tracker
-
+name: SCOTUS Decisions
 # Runs every Monday at 10am (Court releases opinions on decision days)
 on:
   schedule:
