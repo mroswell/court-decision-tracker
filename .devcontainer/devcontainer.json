@@ -24,14 +24,5 @@
   
   "postCreateCommand": "pip install -r requirements.txt",
   
-  "remoteEnv": {
-    "GOOGLE_API_KEY": "${localEnv:GOOGLE_API_KEY}",
-    "COURTLISTENER_TOKEN": "${localEnv:COURTLISTENER_TOKEN}"
-  },
-  
-  "forwardPorts": [],
-  
-  "portsAttributes": {},
-  
-  "remoteUser": "vscode"
+  "forwardPorts": []
 }
