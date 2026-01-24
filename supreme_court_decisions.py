@@ -62,7 +62,7 @@ def fetch_recent_decisions(days_back=8):
     params = {
         'cluster__docket__court': 'scotus',  # CORRECT FILTER - singular, not plural
         'cluster__date_filed__gte': date_after,  # Temporarily disabled for testing
-        'order_by': '-date_filed',
+        # 'order_by': '-date_filed',
         'page_size': 20  # Get 20 most recent
     }
     
