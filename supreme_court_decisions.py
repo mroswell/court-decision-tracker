@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Version C - Court Decision Tracker with AI Political Analysis
-UPDATED FOR API V4 - STATE COURTS EDITION - RATE LIMIT FIXED
-Fetches recent court opinions and uses Gemini AI to classify them as conservative or liberal.
+Version C - Supreme Court Decision Tracker with AI Political Analysis
+UPDATED FOR API V4 - Supreme Court Edition
+Fetches recent Supreme Court opinions and uses Gemini AI to classify them as conservative or liberal.
 """
 
 import os
@@ -23,7 +23,7 @@ def get_clean_env(key_name):
 
 GOOGLE_API_KEY = get_clean_env('GOOGLE_API_KEY')
 CL_TOKEN = get_clean_env('COURTLISTENER_TOKEN')
-COURTLISTENER_API = "https://www.courtlistener.com/api/rest/v4/opinions/"
+COURTLISTENER_API = "https://www.courtlistener.com/api/rest/v4/opinions/"  # V4 API
 
 # Initialize Gemini Client
 client = None
@@ -38,7 +38,7 @@ if GOOGLE_API_KEY:
 def print_troubleshooting_header():
     """Display diagnostic information about configuration"""
     print("="*60)
-    print("COURT DECISION TRACKER - DIAGNOSTIC CHECK")
+    print("SUPREME COURT DECISION TRACKER - DIAGNOSTIC CHECK")
     print("-" * 60)
     print(f"Gemini API Key Found:      {'YES' if GOOGLE_API_KEY else 'NO'}")
     print(f"CourtListener Token Found: {'YES' if CL_TOKEN else 'NO'}")
@@ -50,47 +50,58 @@ def print_troubleshooting_header():
 
 
 def fetch_recent_decisions(days_back=8):
-    """Fetch court decisions from the last N days with comprehensive metadata"""
+    """Fetch Supreme Court decisions from the last N days with comprehensive metadata"""
     if not CL_TOKEN:
         print("[!] ERROR: COURTLISTENER_TOKEN required. Set it in your environment variables.")
         return []
 
-    print(f"[*] Fetching court decisions from last {days_back} days...")
+    print(f"[*] Fetching Supreme Court decisions from last {days_back} days...")
     
     date_after = (datetime.now() - timedelta(days=days_back)).strftime('%Y-%m-%d')
     
     params = {
-        'court': 'scotus',  # Note: This filter is broken, will return various state courts
-        'date_filed__gte': date_after,
-        'order_by': '-date_filed'
+        'cluster__docket__court': 'scotus',  # CORRECT FILTER - singular, not plural
+        # 'date_filed__gte': date_after,  # Temporarily disabled for testing
+        'order_by': '-date_filed',
+        'page_size': 20  # Get 20 most recent
     }
     
     headers = {
         'Authorization': f'Token {CL_TOKEN}',
-        'User-Agent': 'CourtDecisionTracker/2.0 (Educational Research)'
+        'User-Agent': 'SupremeCourtTracker/2.0 (Educational Research)'
     }
     
     try:
-        response = requests.get(COURTLISTENER_API, params=params, headers=headers, timeout=30)
+        print("[*] Fetching opinions from API...")
+        response = requests.get(COURTLISTENER_API, params=params, headers=headers, timeout=60)
         response.raise_for_status()
         results = response.json().get('results', [])
         
-        print(f"[*] Found {len(results)} total results, processing all...")
+        print(f"[*] Found {len(results)} results from initial query")
         
         decisions = []
-        for res in results:
+        for idx, res in enumerate(results, 1):
+            print(f"[*] Processing {idx}/{len(results)}: {res.get('id', 'N/A')}")
+            
             # Get opinion-level data
             opinion_id = res.get('id')
             text = res.get('plain_text', '')
             
-            # Fetch cluster data for complete metadata
+            # Fetch cluster data with field selection
             cluster_url = res.get('cluster')
             cluster_data = {}
             if cluster_url:
                 try:
-                    cluster_res = requests.get(cluster_url, headers=headers, timeout=30)
+                    cluster_res = requests.get(
+                        cluster_url, 
+                        headers=headers, 
+                        timeout=15,
+                        params={'fields': 'case_name,date_filed,author_str,per_curiam,citations,panel,judges'}
+                    )
                     if cluster_res.status_code == 200:
                         cluster_data = cluster_res.json()
+                except requests.Timeout:
+                    print(f"    [!] Cluster fetch timed out")
                 except Exception as e:
                     print(f"    [!] Could not fetch cluster data: {e}")
             
@@ -100,31 +111,49 @@ def fetch_recent_decisions(days_back=8):
                 url_path = res.get('absolute_url', '')
                 case_name = url_path.split('/')[-2].replace('-', ' ').title() if url_path else "Unknown Case"
             
-            # Get text - try plain_text first, then fallback to detail fetch
-            if not text and opinion_id:
-                try:
-                    detail_url = f"{COURTLISTENER_API}{opinion_id}/"
-                    detail_res = requests.get(detail_url, headers=headers, timeout=30)
-                    if detail_res.status_code == 200:
-                        text = detail_res.json().get('plain_text', '')
-                except Exception as e:
-                    print(f"    [!] Could not fetch detail for opinion {opinion_id}: {e}")
+            # Extract author - try multiple sources
+            author = res.get('author_str', '').strip()
             
-            # Extract author
-            author = res.get('author_str', '')
-            
-            # If not in opinion, try cluster
+            # Try cluster author_str
             if not author and cluster_data:
-                author = cluster_data.get('author_str', '')
+                author = cluster_data.get('author_str', '').strip()
+            
+            # Try judges field (SCOTUS often uses this)
+            if not author and cluster_data:
+                judges = cluster_data.get('judges', '').strip()
+                if judges:
+                    author = judges
             
             # Handle per curiam cases
             if not author:
-                if res.get('per_curiam') or (cluster_data and cluster_data.get('per_curiam')):
+                per_curiam = res.get('per_curiam') or cluster_data.get('per_curiam')
+                if per_curiam:
                     author = 'Per Curiam'
                 else:
-                    author = 'N/A'
+                    author = 'Per Curiam (unsigned)'  # SCOTUS default
             
-            # Extract all metadata (prefer cluster data for case-level fields)
+            # Extract citation from citations array
+            citation = 'N/A'
+            if cluster_data:
+                citations = cluster_data.get('citations', [])
+                if citations and isinstance(citations, list) and len(citations) > 0:
+                    first_cite = citations[0]
+                    if isinstance(first_cite, dict):
+                        citation = first_cite.get('cite', 'N/A')
+                    else:
+                        citation = str(first_cite)
+            
+            # Get text if not already present
+            if not text and opinion_id:
+                try:
+                    detail_url = f"{COURTLISTENER_API}{opinion_id}/"
+                    detail_res = requests.get(detail_url, headers=headers, timeout=15)
+                    if detail_res.status_code == 200:
+                        text = detail_res.json().get('plain_text', '')
+                except Exception as e:
+                    print(f"    [!] Could not fetch detail: {e}")
+            
+            # Extract all metadata
             decisions.append({
                 'opinion_id': opinion_id or 'N/A',
                 'cluster_id': cluster_url or 'N/A',
@@ -132,18 +161,22 @@ def fetch_recent_decisions(days_back=8):
                 'date_filed': cluster_data.get('date_filed', res.get('date_filed', 'N/A')),
                 'author': author,
                 'type': res.get('type', 'N/A'),
-                'citation': cluster_data.get('citation_string', res.get('cluster_citation', 'N/A')),
+                'citation': citation,
                 'page_count': res.get('page_count', 'N/A'),
                 'url': f"https://www.courtlistener.com{res.get('absolute_url', '')}",
                 'download_url': res.get('download_url', 'N/A'),
                 'plain_text': text[:15000]  # First 15,000 characters
             })
+            
+            # Small delay between API calls
+            if idx < len(results):
+                time.sleep(0.5)
         
         print(f"[*] Successfully retrieved {len(decisions)} decisions")
         return decisions
         
     except requests.Timeout:
-        print(f"[!] Request timed out - CourtListener API may be slow")
+        print(f"[!] Initial request timed out - CourtListener API may be slow")
         return []
     except Exception as e:
         print(f"[!] Error fetching from CourtListener: {e}")
@@ -159,7 +192,7 @@ def analyze_political_leaning(case_name, decision_text):
     if not decision_text or len(decision_text) < 200:
         return ("Insufficient Text", "N/A", "Not enough text to analyze", "", "", "No text available for summary")
     
-    prompt = f"""Analyze this court decision and classify its political leaning on a 5-point scale.
+    prompt = f"""Analyze this Supreme Court decision and classify its political leaning on a 5-point scale.
 
 Case: {case_name}
 
@@ -198,7 +231,7 @@ Be objective and base your analysis only on the legal reasoning in the decision.
     for attempt in range(max_retries):
         try:
             response = client.models.generate_content(
-                model='gemini-2.0-flash',  # CHANGED FROM gemini-2.0-flash-exp
+                model='gemini-2.0-flash',  # Using stable model, not experimental
                 contents=prompt
             )
             result_text = response.text.strip()
@@ -212,7 +245,7 @@ Be objective and base your analysis only on the legal reasoning in the decision.
             summary = ""
             reasoning = "N/A"
             
-            # Handle multi-line summary by collecting all lines between Summary: and Reasoning:
+            # Handle multi-line summary
             in_summary = False
             summary_lines = []
             
@@ -255,10 +288,9 @@ Be objective and base your analysis only on the legal reasoning in the decision.
 
 
 def load_existing_data(csv_filename='supreme_court_decisions.csv', json_filename='supreme_court_decisions.json'):
-    """Load existing data to avoid re-analyzing same cases (checks both CSV and JSON)"""
+    """Load existing data to avoid re-analyzing same cases"""
     existing_ids = set()
     
-    # Check CSV file
     if os.path.exists(csv_filename):
         try:
             with open(csv_filename, 'r', encoding='utf-8') as f:
@@ -269,7 +301,6 @@ def load_existing_data(csv_filename='supreme_court_decisions.csv', json_filename
         except Exception as e:
             print(f"[!] Error loading existing CSV data: {e}")
     
-    # Check JSON file
     if os.path.exists(json_filename):
         try:
             with open(json_filename, 'r', encoding='utf-8') as f:
@@ -288,8 +319,6 @@ def load_existing_data(csv_filename='supreme_court_decisions.csv', json_filename
 
 def save_to_csv(decisions_data, filename='supreme_court_decisions.csv'):
     """Save analyzed decisions to CSV (append mode to preserve history)"""
-    
-    # Check if file exists to determine if we need headers
     file_exists = os.path.exists(filename)
     
     fieldnames = [
@@ -315,8 +344,6 @@ def save_to_csv(decisions_data, filename='supreme_court_decisions.csv'):
 
 def save_to_json(decisions_data, filename='supreme_court_decisions.json'):
     """Save analyzed decisions to JSON (append mode to preserve history)"""
-    
-    # Load existing data if file exists
     existing_data = []
     if os.path.exists(filename):
         try:
@@ -327,10 +354,8 @@ def save_to_json(decisions_data, filename='supreme_court_decisions.json'):
             print(f"[!] Error loading existing JSON: {e}")
             existing_data = []
     
-    # Append new decisions
     all_data = existing_data + decisions_data
     
-    # Save all data back to file
     with open(filename, 'w', encoding='utf-8') as f:
         json.dump(all_data, f, indent=2, ensure_ascii=False)
     
@@ -339,8 +364,8 @@ def save_to_json(decisions_data, filename='supreme_court_decisions.json'):
 
 def main():
     print("="*60)
-    print("COURT DECISION TRACKER WITH AI ANALYSIS")
-    print("Version C - State Courts Edition (API V4)")
+    print("SUPREME COURT DECISION TRACKER WITH AI ANALYSIS")
+    print("Version C - Supreme Court Edition (API V4)")
     print("="*60)
     print()
     
@@ -360,7 +385,7 @@ def main():
         print("[!] ERROR: Could not initialize Gemini client")
         return
     
-    # Fetch recent decisions (8 days covers multiple court release days)
+    # Fetch recent decisions
     decisions = fetch_recent_decisions(days_back=8)
     
     if not decisions:
@@ -422,7 +447,7 @@ def main():
         print(f"    Tags: {tags[:80]}{'...' if len(tags) > 80 else ''}")
         print(f"    Summary: {summary[:100]}{'...' if len(summary) > 100 else ''}")
         
-        # Rate limiting - INCREASED TO 7 SECONDS (10 requests per minute = 6 second minimum, adding buffer)
+        # Rate limiting - 7 seconds between requests
         if i < len(new_decisions):
             time.sleep(7)
     
