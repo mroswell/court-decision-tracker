@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supreme Court Opinions Archive</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --navy: #1a2332;
+            --burgundy: #8b2635;
+            --cream: #faf8f4;
+            --gold: #d4af37;
+            --slate: #475569;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'IBM Plex Sans', sans-serif;
+            background: linear-gradient(135deg, var(--cream) 0%, #f5f1ea 100%);
+            color: var(--navy);
+            line-height: 1.6;
+        }
+        
+        h1, h2, h3, h4 {
+            font-family: 'Crimson Pro', serif;
+        }
+        
+        /* Utility Classes */
+        .hidden { display: none; }
+        .min-h-screen { min-height: 100vh; }
+        .max-w-7xl { max-width: 80rem; }
+        .mx-auto { margin-left: auto; margin-right: auto; }
+        .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+        .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+        .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+        .py-16 { padding-top: 4rem; padding-bottom: 4rem; }
+        .p-6 { padding: 1.5rem; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-3 { margin-bottom: 0.75rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mb-6 { margin-bottom: 1.5rem; }
+        .mb-8 { margin-bottom: 2rem; }
+        .w-full { width: 100%; }
+        .rounded { border-radius: 0.25rem; }
+        .rounded-lg { border-radius: 0.5rem; }
+        .shadow-sm { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+        .shadow-md { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .border-b-2 { border-bottom-width: 2px; }
+        .border-gray-200 { border-color: #e5e7eb; }
+        .bg-white { background-color: white; }
+        .bg-red-50 { background-color: #fef2f2; }
+        .border-red-200 { border-color: #fecaca; }
+        .text-red-800 { color: #991b1b; }
+        .text-red-600 { color: #dc2626; }
+        .font-semibold { font-weight: 600; }
+        .font-bold { font-weight: 700; }
+        .font-medium { font-weight: 500; }
+        
+        /* Grid System */
+        .grid { display: grid; }
+        .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+        .gap-6 { gap: 1.5rem; }
+        .gap-4 { gap: 1rem; }
+        .gap-3 { gap: 0.75rem; }
+        .gap-2 { gap: 0.5rem; }
+        
+        /* Flexbox */
+        .flex { display: flex; }
+        .flex-wrap { flex-wrap: wrap; }
+        .justify-between { justify-content: space-between; }
+        .items-start { align-items: flex-start; }
+        
+        /* Text Sizing */
+        .text-5xl { font-size: 3rem; line-height: 1; }
+        .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+        .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+        .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+        .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+        .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+        .text-6xl { font-size: 3.75rem; line-height: 1; }
+        
+        /* Text Utilities */
+        .text-center { text-align: center; }
+        .uppercase { text-transform: uppercase; }
+        .italic { font-style: italic; }
+        .leading-relaxed { line-height: 1.625; }
+        
+        /* Responsive Grid */
+        @media (min-width: 768px) {
+            .md\:grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+        }
+        
+        .case-card {
+            background: white;
+            border: 1px solid rgba(26, 35, 50, 0.1);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .case-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--burgundy);
+            transform: scaleY(0);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: bottom;
+        }
+        
+        .case-card:hover {
+            box-shadow: 0 20px 40px rgba(26, 35, 50, 0.15);
+            transform: translateY(-4px);
+        }
+        
+        .case-card:hover::before {
+            transform: scaleY(1);
+            transform-origin: top;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 2px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .badge-conservative {
+            background: rgba(220, 38, 38, 0.1);
+            color: #b91c1c;
+        }
+        
+        .badge-liberal {
+            background: rgba(37, 99, 235, 0.1);
+            color: #1d4ed8;
+        }
+        
+        .badge-center {
+            background: rgba(71, 85, 105, 0.1);
+            color: var(--slate);
+        }
+        
+        .tag {
+            background: rgba(139, 38, 53, 0.08);
+            color: var(--burgundy);
+            padding: 0.25rem 0.65rem;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+            transition: all 0.2s ease;
+        }
+        
+        .tag:hover {
+            background: rgba(139, 38, 53, 0.15);
+            cursor: pointer;
+        }
+        
+        .filter-btn {
+            padding: 0.5rem 1rem;
+            border: 2px solid rgba(26, 35, 50, 0.2);
+            background: white;
+            color: var(--navy);
+            font-weight: 500;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-size: 0.875rem;
+        }
+        
+        .filter-btn:hover {
+            border-color: var(--burgundy);
+            color: var(--burgundy);
+        }
+        
+        .filter-btn.active {
+            background: var(--burgundy);
+            color: white;
+            border-color: var(--burgundy);
+        }
+        
+        .search-input {
+            border: 2px solid rgba(26, 35, 50, 0.15);
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: white;
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--burgundy);
+            box-shadow: 0 0 0 3px rgba(139, 38, 53, 0.1);
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .case-card {
+            animation: fadeIn 0.6s ease forwards;
+        }
+        
+        .header-accent {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .header-accent::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 0;
+            width: 60%;
+            height: 3px;
+            background: var(--gold);
+        }
+        
+        .text-navy { color: var(--navy); }
+        .text-slate { color: var(--slate); }
+        .text-burgundy { color: var(--burgundy); }
+        .text-white { color: white; }
+        .text-red-300 { color: #fca5a5; }
+        .text-blue-300 { color: #93c5fd; }
+        .text-gray-300 { color: #d1d5db; }
+        .opacity-80 { opacity: 0.8; }
+        
+        .bg-navy { background-color: var(--navy); }
+        
+        .tracking-wide { letter-spacing: 0.025em; }
+        
+        .border { border-width: 1px; }
+        
+        a { 
+            text-decoration: none;
+            color: inherit;
+        }
+        
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white border-b-2 border-gray-200 shadow-sm">
+            <div class="max-w-7xl mx-auto px-6 py-8">
+                <h1 class="text-5xl font-bold text-navy mb-2">
+                    <span class="header-accent">Supreme Court</span>
+                </h1>
+                <p class="text-xl text-slate font-serif italic">Opinions Archive 2024-2025</p>
+            </div>
+        </header>
+
+        <!-- Stats Bar -->
+        <div class="bg-navy text-white py-4">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="text-center">
+                        <div class="text-3xl font-bold" id="total-cases">0</div>
+                        <div class="text-sm uppercase tracking-wide opacity-80">Total Cases</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-blue-300" id="liberal-count">0</div>
+                        <div class="text-sm uppercase tracking-wide opacity-80">Liberal</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-gray-300" id="center-count">0</div>
+                        <div class="text-sm uppercase tracking-wide opacity-80">Center</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-3xl font-bold text-red-300" id="conservative-count">0</div>
+                        <div class="text-sm uppercase tracking-wide opacity-80">Conservative</div>
+                    </div>
+            </div>
+            </div>
+        </div>
+
+        <!-- Filters & Search -->
+        <div class="max-w-7xl mx-auto px-6 py-8">
+            <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                <!-- Search -->
+                <div class="mb-6">
+                    <input 
+                        type="text" 
+                        id="search-input" 
+                        placeholder="Search by case name, author, or summary..."
+                        class="search-input w-full rounded"
+                    />
+                </div>
+
+                <!-- Classification Filter -->
+                <div class="mb-6">
+                    <h3 class="font-serif text-lg font-semibold mb-3 text-navy">Classification</h3>
+                    <div class="flex flex-wrap gap-3">
+                        <button class="filter-btn active" data-classification="all">All</button>
+                        <button class="filter-btn" data-classification="Liberal">Liberal</button>
+                        <button class="filter-btn" data-classification="Center">Center</button>
+                        <button class="filter-btn" data-classification="Conservative">Conservative</button>
+
+                    </div>
+                </div>
+
+                <!-- Category Filter -->
+                <div>
+                    <h3 class="font-serif text-lg font-semibold mb-3 text-navy">Categories</h3>
+                    <div id="category-filters" class="flex flex-wrap gap-2"></div>
+                </div>
+            </div>
+
+            <!-- Results Count -->
+            <div class="mb-4">
+                <p class="text-slate font-medium">
+                    Showing <span id="results-count" class="text-burgundy font-bold">0</span> cases
+                </p>
+            </div>
+
+            <!-- Case Grid -->
+            <div id="cases-grid" class="grid grid-cols-1 gap-6">
+                <!-- Cases will be inserted here -->
+            </div>
+
+            <!-- No Results -->
+            <div id="no-results" class="hidden text-center py-16">
+                <div class="text-6xl mb-4">⚖️</div>
+                <h3 class="text-2xl font-serif font-bold text-navy mb-2">No cases found</h3>
+                <p class="text-slate">Try adjusting your filters or search terms</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== CONFIGURATION =====
+        // Change this to point to your JSON file location
+        // Local file: 'supreme_court_decisions.json'
+        // GitHub raw URL example: 'https://raw.githubusercontent.com/username/repo/main/supreme_court_decisions.json'
+        const DATA_SOURCE = 'supreme_court_decisions.json';
+        // =========================
+        
+        let opinionsData = [];
+        let allCategories = new Set();
+        let currentFilter = {
+            classification: 'all',
+            category: 'all',
+            search: ''
+        };
+
+        // Parse tags and extract all unique categories
+        function extractCategories() {
+            opinionsData.forEach(opinion => {
+                const tags = opinion.tags.replace(/[\[\]]/g, '').split(';');
+                tags.forEach(tag => {
+                    const category = tag.trim();
+                    if (category) {
+                        allCategories.add(category);
+                    }
+                });
+            });
+        }
+
+        // Initialize category filters
+        function initCategoryFilters() {
+            const container = document.getElementById('category-filters');
+            const sortedCategories = Array.from(allCategories).sort();
+            
+            const allBtn = document.createElement('button');
+            allBtn.className = 'tag active';
+            allBtn.textContent = 'All Categories';
+            allBtn.onclick = () => filterByCategory('all');
+            container.appendChild(allBtn);
+            
+            sortedCategories.forEach(category => {
+                const btn = document.createElement('button');
+                btn.className = 'tag';
+                btn.textContent = category;
+                btn.onclick = () => filterByCategory(category);
+                container.appendChild(btn);
+            });
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        }
+
+        // Get badge class
+        function getBadgeClass(classification) {
+            const map = {
+                'Liberal': 'badge-liberal',
+                'Center': 'badge-center',
+                'Conservative': 'badge-conservative'
+            };
+            return map[classification] || 'badge-center';
+        }
+
+        // Render case card
+        function renderCase(opinion) {
+            const tags = opinion.tags.replace(/[\[\]]/g, '').split(';').map(t => t.trim()).filter(t => t);
+            
+            return `
+                <div class="case-card p-6 rounded-lg">
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h2 class="text-2xl font-serif font-bold text-navy mb-1">${opinion.case_name}</h2>
+                            <p class="text-sm text-slate">Filed: ${formatDate(opinion.date_filed)} • Author: ${opinion.author}</p>
+                        </div>
+                        <span class="badge ${getBadgeClass(opinion.classification)}">${opinion.classification}</span>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-2 mb-4">
+                        ${tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
+                    </div>
+                    
+                    <p class="text-slate mb-4 leading-relaxed">${opinion.summary}</p>
+                    
+                    <div class="flex gap-4 text-sm">
+                        <a href="${opinion.url}" target="_blank" class="text-burgundy hover:underline font-medium">View Opinion →</a>
+                        <a href="${opinion.download_url}" target="_blank" class="text-slate hover:text-burgundy hover:underline">Download PDF</a>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Filter and display cases
+        function displayCases() {
+            const filtered = opinionsData.filter(opinion => {
+                // Classification filter
+                if (currentFilter.classification !== 'all' && opinion.classification !== currentFilter.classification) {
+                    return false;
+                }
+                
+                // Category filter
+                if (currentFilter.category !== 'all') {
+                    const tags = opinion.tags.replace(/[\[\]]/g, '').split(';').map(t => t.trim());
+                    if (!tags.includes(currentFilter.category)) {
+                        return false;
+                    }
+                }
+                
+                // Search filter
+                if (currentFilter.search) {
+                    const searchLower = currentFilter.search.toLowerCase();
+                    return (
+                        opinion.case_name.toLowerCase().includes(searchLower) ||
+                        opinion.author.toLowerCase().includes(searchLower) ||
+                        opinion.summary.toLowerCase().includes(searchLower) ||
+                        opinion.tags.toLowerCase().includes(searchLower)
+                    );
+                }
+                
+                return true;
+            });
+            
+            const container = document.getElementById('cases-grid');
+            const noResults = document.getElementById('no-results');
+            
+            if (filtered.length === 0) {
+                container.classList.add('hidden');
+                noResults.classList.remove('hidden');
+            } else {
+                container.classList.remove('hidden');
+                noResults.classList.add('hidden');
+                container.innerHTML = filtered.map(renderCase).join('');
+            }
+            
+            document.getElementById('results-count').textContent = filtered.length;
+        }
+
+        // Update stats
+        function updateStats() {
+            document.getElementById('total-cases').textContent = opinionsData.length;
+            document.getElementById('liberal-count').textContent = 
+                opinionsData.filter(o => o.classification === 'Liberal').length;
+            document.getElementById('center-count').textContent = 
+                opinionsData.filter(o => o.classification === 'Center').length;
+            document.getElementById('conservative-count').textContent = 
+                opinionsData.filter(o => o.classification === 'Conservative').length;
+        }
+
+        // Filter by classification
+        function filterByClassification(classification) {
+            currentFilter.classification = classification;
+            
+            // Update button states
+            document.querySelectorAll('[data-classification]').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.classification === classification) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            displayCases();
+        }
+
+        // Filter by category
+        function filterByCategory(category) {
+            currentFilter.category = category;
+            
+            // Update button states
+            document.querySelectorAll('#category-filters .tag').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent === category || (category === 'all' && btn.textContent === 'All Categories')) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            displayCases();
+        }
+
+        // Search handler
+        function handleSearch(e) {
+            currentFilter.search = e.target.value;
+            displayCases();
+        }
+
+        // Initialize
+        async function init() {
+            try {
+                // Fetch the JSON data
+                const response = await fetch(DATA_SOURCE);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                opinionsData = await response.json();
+                
+                // Initialize the app with loaded data
+                extractCategories();
+                initCategoryFilters();
+                updateStats();
+                displayCases();
+                
+                // Event listeners
+                document.querySelectorAll('[data-classification]').forEach(btn => {
+                    btn.addEventListener('click', () => filterByClassification(btn.dataset.classification));
+                });
+                
+                document.getElementById('search-input').addEventListener('input', handleSearch);
+            } catch (error) {
+                console.error('Error loading opinions data:', error);
+                document.getElementById('cases-grid').innerHTML = `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+                        <p class="text-red-800 font-semibold mb-2">Error Loading Data</p>
+                        <p class="text-red-600">Could not load supreme_court_decisions.json. Please make sure the file is in the same directory as this HTML file.</p>
+                    </div>
+                `;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
