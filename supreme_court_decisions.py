@@ -61,7 +61,7 @@ def fetch_recent_decisions(days_back=8):
     
     params = {
         'cluster__docket__court': 'scotus',  # CORRECT FILTER - singular, not plural
-        # 'date_filed__gte': date_after,  # Temporarily disabled for testing
+        'cluster__date_filed__gte': date_after,  # Temporarily disabled for testing
         'order_by': '-date_filed',
         'page_size': 20  # Get 20 most recent
     }
@@ -287,7 +287,7 @@ Be objective and base your analysis only on the legal reasoning in the decision.
     return ("Error", "N/A", "Max retries exceeded", "", "", "Error generating summary")
 
 
-def load_existing_data(csv_filename='supreme_court_decisions.csv', json_filename='supreme_court_decisions.json'):
+def load_existing_data(csv_filename='supreme_court_decisions_datefilter.csv', json_filename='supreme_court_decisions_datefilter.json'):
     """Load existing data to avoid re-analyzing same cases"""
     existing_ids = set()
     
